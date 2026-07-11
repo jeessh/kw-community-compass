@@ -25,6 +25,7 @@ class EventBase(BaseModel):
     ends_at: datetime | None = None
     accessibility_tags: list[str] = []
     is_free: bool = True
+    requires_signup: bool = False
     cover_image_url: str | None = None
 
 
@@ -41,6 +42,7 @@ class EventUpdate(BaseModel):
     ends_at: datetime | None = None
     accessibility_tags: list[str] | None = None
     is_free: bool | None = None
+    requires_signup: bool | None = None
     cover_image_url: str | None = None
 
 

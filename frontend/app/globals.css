@@ -4,6 +4,8 @@
 
 :root {
   color-scheme: light;
+  /* Lexend Deca (loaded in layout.tsx) serves both display and body. */
+  --font-body: var(--font-display);
 }
 
 html,

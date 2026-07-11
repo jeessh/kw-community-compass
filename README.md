@@ -1,30 +1,18 @@
 # KW Community Compass
 
-An accessible, needs-first platform where Kitchener-Waterloo nonprofits contribute
-community programming and members of all abilities discover what fits them — all
-in one place.
+An accessible, needs-first platform where Kitchener-Waterloo nonprofits post
+community programming and members discover what fits them. Built for a one-day
+hackathon with KW Hab.
 
-Built for a one-day hackathon with KW Hab.
+## Member experience
 
-## Why it's different
+One big card at a time. To attend a program: drag the card into the slot, press
+and hold it (2s), or hold the ↓ arrow key (1.5s) — all resolve to the same "drop
+into the slot → you're attending" moment, no forms. Arrows move between programs;
+the person icon opens settings.
 
-The old shared community calendar is a grid that answers "what's on Tuesday?"
-This app answers **"what do I need, and can I actually use it?"** — organized
-around needs and accessibility, with a deliberately tactile, one-thing-at-a-time
-interface.
-
-### The member experience
-A single big card at a time. To attend a program you either:
-- **drag** the card down into the slot,
-- **press and hold** it (2s), or
-- **hold the ↓ arrow key** (1.5s).
-
-Every path resolves into the same "drop into the slot → you're attending" moment.
-Attending auto-registers the member — no forms. Left/right (arrows or on-screen)
-move between programs; the person icon (or drag-up / hold-↑) opens settings.
-
-Sign-up asks only for a first and last name; the app generates a memorable
-3-icon key (e.g. 🌳🐱🍎 = `tree_cat_apple`) as the password.
+Sign-up asks only for first and last name; the app generates a 3-icon key
+(e.g. 🌳🐱🍎 = `tree_cat_apple`) as the password.
 
 ## Stack
 - **Frontend:** Next.js (App Router) · Tailwind · Framer Motion — see [`frontend/`](frontend)
@@ -51,6 +39,23 @@ npm run dev
 
 See [`backend/README.md`](backend/README.md) for the data model, permissions, and
 API reference.
+
+## Deploy (Vercel)
+
+One project via [Services](https://vercel.com/docs/services) (root [`vercel.json`](vercel.json)):
+`/api/*` routes to the FastAPI backend, everything else to the Next.js frontend.
+Shared origin keeps the `SameSite=Lax` auth cookie working.
+
+Production env vars:
+
+| Service  | Var | Value |
+|---|---|---|
+| backend  | `DATABASE_URL` | Supabase pooler string, port 6543, `postgresql+psycopg://…` |
+| backend  | `JWT_SECRET` | same as `backend/.env` |
+| backend  | `COOKIE_SECURE` | `true` |
+| backend  | `ROOT_PATH` | `/api` |
+| backend  | `FRONTEND_ORIGIN` | deployed URL (for CORS) |
+| frontend | `NEXT_PUBLIC_API_URL` | `/api` |
 
 ## Roles
 - **Members** — discover + attend programs (simple icon sign-in)

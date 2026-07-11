@@ -24,6 +24,7 @@ export default function NewEventPage() {
     starts_at: "",
     cover_image_url: "",
     is_free: true,
+    requires_signup: false,
   });
   const [tags, setTags] = useState<Set<string>>(new Set());
   const [gallery, setGallery] = useState("");
@@ -170,6 +171,16 @@ export default function NewEventPage() {
             className="h-5 w-5"
           />
           This program is free
+        </label>
+
+        <label className="flex items-center gap-3 text-lg text-ink">
+          <input
+            type="checkbox"
+            checked={form.requires_signup}
+            onChange={(e) => set("requires_signup", e.target.checked)}
+            className="h-5 w-5"
+          />
+          Requires signup (otherwise it&apos;s drop-in)
         </label>
       </div>
 

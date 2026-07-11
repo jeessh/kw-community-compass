@@ -8,7 +8,7 @@ from app.db.session import Base, engine
 import app.models  # noqa: F401
 from app.api.routes import attendance, auth, events, hosts, users
 
-app = FastAPI(title="KW Community Compass API")
+app = FastAPI(title="KW Community Compass API", root_path=settings.ROOT_PATH)
 
 app.add_middleware(
     CORSMiddleware,

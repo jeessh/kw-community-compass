@@ -1,8 +1,7 @@
 # KW Community Compass — Backend
 
-FastAPI + SQLAlchemy, backed by Supabase Postgres. Custom cookie auth (Supabase
-is used as the database only, not Supabase Auth) so we can support the icon /
-username login scheme.
+FastAPI + SQLAlchemy on Supabase Postgres (database only, not Supabase Auth).
+Custom cookie auth supports the icon / username login scheme.
 
 ## Data model
 
@@ -47,7 +46,6 @@ Interactive docs: http://localhost:8000/docs
 - `POST/DELETE /events/{id}/attend` (user) · `GET /users/me/events`
 - `GET /users` · `PATCH /users/{id}` · `DELETE /users/{id}` (admin)
 
-## Frontend note
-The auth cookie is `httpOnly` + `SameSite=Lax`. From Next.js, send requests with
-`credentials: "include"` and keep the API on the same site (or set
-`COOKIE_SECURE=true` behind HTTPS) so the cookie flows.
+## Auth cookie
+`httpOnly` + `SameSite=Lax`. Callers send `credentials: "include"`; keep the API
+same-origin (or set `COOKIE_SECURE=true` behind HTTPS) so the cookie flows.

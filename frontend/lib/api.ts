@@ -36,6 +36,7 @@ export type Event = {
   ends_at?: string | null;
   accessibility_tags: string[];
   is_free: boolean;
+  requires_signup: boolean;
   cover_image_url?: string | null;
   images: EventImage[];
 };

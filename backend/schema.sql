@@ -39,6 +39,7 @@ create table if not exists events (
     ends_at             timestamptz,
     accessibility_tags  text[] not null default '{}',
     is_free             boolean not null default true,
+    requires_signup     boolean not null default false,  -- true = member must sign up
     cover_image_url     text,
     created_at          timestamptz not null default now(),
     updated_at          timestamptz not null default now()

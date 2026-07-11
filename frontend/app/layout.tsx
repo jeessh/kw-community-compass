@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Inter } from "next/font/google";
+import { Lexend_Deca } from "next/font/google";
 import "./globals.css";
 
-const display = Bricolage_Grotesque({
+const lexend = Lexend_Deca({
   subsets: ["latin"],
   variable: "--font-display",
-  weight: ["500", "700", "800"],
-});
-const body = Inter({
-  subsets: ["latin"],
-  variable: "--font-body",
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -23,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
+    <html lang="en" className={lexend.variable}>
       <body>{children}</body>
     </html>
   );
