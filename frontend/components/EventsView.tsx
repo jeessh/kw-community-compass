@@ -26,6 +26,7 @@ import { useTextToSpeech } from "@/lib/useTextToSpeech";
 import { useSpeechCommands } from "@/lib/useSpeechCommands";
 import { eventToSpeech } from "@/lib/eventSpeech";
 import { PersonIcon } from "@/components/PersonIcon";
+import { SavedEvents } from "@/components/SavedEvents";
 
 const DROP_THRESHOLD = 150; // drag-down px to attend
 const SETTINGS_THRESHOLD = 130; // drag-up px to open settings
@@ -455,8 +456,8 @@ export function EventsView() {
         </div>
       )}
 
-      {/* ---------------- SETTINGS MORPH ---------------- */}
-      <SettingsMorph
+      {/* ---------------- SAVED EVENTS (settings tab) ---------------- */}
+      <SavedEvents
         me={me}
         reveal={settingsReveal}
         onClose={closeSettings}
@@ -926,141 +927,5 @@ function SideNav({
   );
 }
 
-function SettingsMorph({
-  me,
-  reveal,
-  onClose,
-  ttsEnabled,
-  voiceEnabled,
-  ttsSupported,
-  voiceSupported,
-  onToggleTts,
-  onToggleVoice,
-  onLogout,
-}: {
-  me: Me | null;
-  reveal: number;
-  onClose: () => void;
-  ttsEnabled: boolean;
-  voiceEnabled: boolean;
-  ttsSupported: boolean;
-  voiceSupported: boolean;
-  onToggleTts: (v: boolean) => void;
-  onToggleVoice: (v: boolean) => void;
-  onLogout: () => void;
-}) {
-  if (reveal <= 0) return null;
-  return (
-    <div
-      className="absolute inset-0 z-10 grid place-items-center overflow-y-auto py-10"
-      style={{ opacity: reveal }}
-      onClick={onClose}
-    >
-      <div className="flex flex-col items-center gap-4">
-        <div
-          className="grid place-items-center rounded-full bg-white shadow-lift"
-          style={{ height: 96 + reveal * 96, width: 96 + reveal * 96 }}
-        >
-          <PersonIcon
-            className="text-accent"
-            style={{ height: 44 + reveal * 40, width: 44 + reveal * 40 }}
-          />
-        </div>
-        {me && (
-          <p className="font-display text-3xl font-extrabold text-ink">
-            {me.first_name} {me.last_name}
-          </p>
-        )}
-
-        {reveal > 0.95 && (
-          // stopPropagation: the backdrop closes on click, the card must not.
-          <div
-            className="mt-2 w-[min(440px,86vw)] rounded-3xl bg-white p-6 shadow-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="font-display text-xl font-extrabold text-ink">
-              Voice &amp; accessibility
-            </h2>
-
-            <ToggleRow
-              label="Read events aloud"
-              hint="Speaks each event as you browse."
-              checked={ttsEnabled}
-              disabled={!ttsSupported}
-              disabledHint="Not supported in this browser."
-              onChange={onToggleTts}
-            />
-            <ToggleRow
-              label="Voice commands"
-              hint={'Say "next", "back", "add", or "settings".'}
-              checked={voiceEnabled}
-              disabled={!voiceSupported}
-              disabledHint="Not supported in this browser (try Chrome or Edge)."
-              onChange={onToggleVoice}
-            />
-
-            {voiceEnabled && voiceSupported && (
-              <p className="mt-3 text-sm text-muted">
-                Listening uses your microphone; audio may be sent to your
-                browser’s speech service for recognition.
-              </p>
-            )}
-
-            <button
-              onClick={onLogout}
-              className="mt-6 w-full rounded-xl border-2 border-edge px-5 py-3 font-semibold text-pop transition-colors hover:border-pop"
-            >
-              Log out
-            </button>
-            <p className="mt-4 text-center text-sm text-muted">
-              Tap outside to go back
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ToggleRow({
-  label,
-  hint,
-  checked,
-  disabled,
-  disabledHint,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  checked: boolean;
-  disabled?: boolean;
-  disabledHint?: string;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="mt-4 flex items-start justify-between gap-4">
-      <div>
-        <p className="font-display text-lg font-semibold text-ink">{label}</p>
-        <p className="text-sm text-muted">
-          {disabled ? disabledHint ?? hint : hint}
-        </p>
-      </div>
-      <button
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={`relative mt-1 h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-40 ${
-          checked ? "bg-accent" : "bg-edge"
-        }`}
-      >
-        <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-            checked ? "left-6" : "left-1"
-          }`}
-        />
-      </button>
-    </div>
-  );
-}
+// SettingsMorph + ToggleRow moved to components/SavedEvents.tsx — the settings
+// tab is now the "Saved Events" overview (see <SavedEvents/> above).
