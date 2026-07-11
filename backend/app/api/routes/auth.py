@@ -134,9 +134,17 @@ def auth_user(body: UserAuth, response: Response, db: Session = Depends(get_db))
                 "icons": user.icons,
             }
 
-    # 2) No match. If those icons already belong to someone else, we can't
-    #    create the account (icons are globally unique).
-    if db.query(User).filter(User.icons == icons).first():
+    # 2) No match. If those icons already belong to someone, we can't create
+    #    the account (icons are globally unique).
+    taken = db.query(User).filter(User.icons == icons).first()
+    if taken:
+        # Icon-only is the norm; a password account owning these icons (only
+        # creatable via the direct API, not this UI) can't sign in with icons.
+        if taken.auth_type == "password" and taken.username == username:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "This account signs in with a password, not icons.",
+            )
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "That icon combination is already taken — pick a different set of "
