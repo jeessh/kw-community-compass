@@ -23,6 +23,24 @@ export async function api<T = unknown>(
   return (await res.json()) as T;
 }
 
+/**
+ * Upload an image file to the host-only endpoint and return its public URL.
+ * Uses FormData directly (not `api()`) so the browser sets the multipart
+ * boundary — forcing application/json would break the upload.
+ */
+export async function uploadImage(file: File): Promise<string> {
+  const body = new FormData();
+  body.append("file", file);
+  const res = await fetch(`${API}/events/images`, {
+    method: "POST",
+    credentials: "include",
+    body,
+  });
+  if (!res.ok) throw new ApiError(res.status, await res.text());
+  const data = (await res.json()) as { url: string };
+  return data.url;
+}
+
 export type EventImage = { id: string; url: string; caption?: string | null };
 
 export type Event = {

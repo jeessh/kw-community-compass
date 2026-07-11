@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api, type Event } from "@/lib/api";
 import { Modal } from "@/components/Modal";
+import { ImageDrop } from "@/components/ImageDrop";
 
 /** Turn an ISO timestamp into a value the datetime-local input accepts. */
 function toLocalInput(iso?: string | null): string {
@@ -32,6 +33,9 @@ export function EditEventModal({
   const [startsAt, setStartsAt] = useState(toLocalInput(event.starts_at));
   const [isFree, setIsFree] = useState(event.is_free);
   const [requiresSignup, setRequiresSignup] = useState(event.requires_signup);
+  const [coverImageUrl, setCoverImageUrl] = useState(
+    event.cover_image_url ?? "",
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +57,7 @@ export function EditEventModal({
           starts_at: startsAt ? new Date(startsAt).toISOString() : null,
           is_free: isFree,
           requires_signup: requiresSignup,
+          cover_image_url: coverImageUrl || null,
         }),
       });
       onSaved();
@@ -110,6 +115,12 @@ export function EditEventModal({
             className="field-input"
           />
         </Field>
+
+        <ImageDrop
+          label="Cover image"
+          value={coverImageUrl}
+          onChange={setCoverImageUrl}
+        />
 
         <label className="flex items-center gap-3 text-lg text-ink">
           <input

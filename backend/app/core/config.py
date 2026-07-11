@@ -14,6 +14,13 @@ class Settings(BaseSettings):
 
     FRONTEND_ORIGIN: str = "http://localhost:3000"
 
+    # Supabase Storage — used only by the image-upload endpoint. The SECRET key
+    # (sb_secret_…) bypasses RLS and must stay server-side; never expose it to
+    # the browser. Empty when uploads aren't configured; the endpoint 503s.
+    SUPABASE_URL: str = ""
+    SUPABASE_SECRET_KEY: str = ""
+    SUPABASE_IMAGE_BUCKET: str = "event-images"
+
     # Path prefix the backend is served under. Empty in local dev (the frontend
     # calls http://localhost:8000 directly); set to "/api" in Vercel production,
     # where the top-level rewrite routes /api/* to this service and forwards the

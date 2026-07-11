@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, api } from "@/lib/api";
+import { ImageDrop } from "@/components/ImageDrop";
 
 const ACCESS_OPTIONS = [
   "wheelchair_accessible",
@@ -27,7 +28,7 @@ export default function NewEventPage() {
     requires_signup: false,
   });
   const [tags, setTags] = useState<Set<string>>(new Set());
-  const [gallery, setGallery] = useState("");
+  const [gallery, setGallery] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,11 +55,7 @@ export default function NewEventPage() {
             ? new Date(form.starts_at).toISOString()
             : null,
           accessibility_tags: [...tags],
-          gallery: gallery
-            .split("\n")
-            .map((u) => u.trim())
-            .filter(Boolean)
-            .map((url, i) => ({ url, sort_order: i })),
+          gallery: gallery.map((url, i) => ({ url, sort_order: i })),
         }),
       });
       router.push("/host/events");
@@ -123,23 +120,17 @@ export default function NewEventPage() {
             className="input"
           />
         </Field>
-        <Field label="Cover image URL">
-          <input
-            value={form.cover_image_url}
-            onChange={(e) => set("cover_image_url", e.target.value)}
-            placeholder="https://…"
-            className="input"
-          />
-        </Field>
-        <Field label="Gallery image URLs (one per line)">
-          <textarea
-            rows={3}
-            value={gallery}
-            onChange={(e) => setGallery(e.target.value)}
-            placeholder={"https://…\nhttps://…"}
-            className="input"
-          />
-        </Field>
+        <ImageDrop
+          label="Cover image"
+          value={form.cover_image_url}
+          onChange={(url) => set("cover_image_url", url)}
+        />
+        <ImageDrop
+          label="Gallery images"
+          multiple
+          value={gallery}
+          onChange={setGallery}
+        />
 
         <fieldset>
           <legend className="text-sm font-semibold text-muted">

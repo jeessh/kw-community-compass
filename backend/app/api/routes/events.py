@@ -1,15 +1,51 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_host, get_db
+from app.core.storage import StorageError, upload_image
 from app.models.event import Event
 from app.models.event_image import EventImage
 from app.models.host import Host
 from app.schemas.event import EventCreate, EventOut, EventUpdate
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+# Cover + gallery uploads accept these; must match the bucket's allowed types.
+ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+@router.post("/images", status_code=status.HTTP_201_CREATED)
+async def upload_event_image(
+    file: UploadFile = File(...),
+    _host: Host = Depends(get_current_host),  # host-only
+):
+    """Upload a cover/gallery image and return its public URL.
+
+    The frontend uploads on drop/select, then stores the returned URL on the
+    event via the normal create/patch flow — no schema change.
+    """
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            "Please choose a PNG, JPEG, WebP, or GIF image.",
+        )
+    data = await file.read()
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            "Image is too large (max 5 MB).",
+        )
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The file is empty.")
+
+    try:
+        url = upload_image(data, file.content_type)
+    except StorageError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+    return {"url": url}
 
 
 def _owns_or_admin(host: Host, event: Event) -> bool:
