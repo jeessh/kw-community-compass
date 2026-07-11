@@ -15,6 +15,18 @@ class UserSignup(BaseModel):
     interest_categories: list[str] = []
 
 
+class UserAuth(BaseModel):
+    """Unified member entry: log in if the name + icon key matches an existing
+    account, otherwise create it. The 3-icon set is the credential."""
+
+    first_name: str
+    last_name: str
+    icons: list[str]
+    # Applied only when a new account is created (ignored on login).
+    accessibility_prefs: list[str] = []
+    interest_categories: list[str] = []
+
+
 class UserLogin(BaseModel):
     username: str
     # Either the icon password ("tree_cat_apple") or the custom password.

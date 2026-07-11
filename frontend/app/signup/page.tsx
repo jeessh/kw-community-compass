@@ -20,6 +20,8 @@ export default function SignupPage() {
   const [picked, setPicked] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Whether the submit logged into an existing account or created a new one.
+  const [mode, setMode] = useState<"login" | "signup" | null>(null);
 
   function togglePick(slug: string) {
     setError(null);
@@ -30,11 +32,13 @@ export default function SignupPage() {
     });
   }
 
-  async function createAccount() {
+  async function submit() {
     setBusy(true);
     setError(null);
     try {
-      await api("/auth/signup/user", {
+      // One endpoint: logs in if this name + icon key already exists, else
+      // creates the account. `mode` tells us which happened.
+      const res = await api<{ mode: "login" | "signup" }>("/auth/user", {
         method: "POST",
         body: JSON.stringify({
           first_name: first,
@@ -42,13 +46,14 @@ export default function SignupPage() {
           icons: picked,
         }),
       });
+      setMode(res.mode);
       setStep("transition");
-      // Cookie is set by signup; let the transition play, then fade into events.
+      // Cookie is set by the endpoint; let the transition play, then continue.
       window.setTimeout(() => router.replace("/"), 1900);
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         setError(
-          "That icon combination is already taken — go back and pick a different set.",
+          "Those icons already belong to someone else — go back and pick a different set.",
         );
       } else {
         setError("Something went wrong. Please try again.");
@@ -291,10 +296,10 @@ export default function SignupPage() {
               </button>
               <button
                 disabled={busy}
-                onClick={createAccount}
+                onClick={submit}
                 className="rounded-2xl bg-accent px-10 py-4 text-xl font-semibold text-white shadow-card transition-transform enabled:hover:scale-[1.02] disabled:opacity-40"
               >
-                {busy ? "Creating…" : "Confirm & create account"}
+                {busy ? "…" : "Continue"}
               </button>
             </div>
           </motion.section>
@@ -332,10 +337,14 @@ export default function SignupPage() {
               transition={{ delay: 0.5 }}
               className="mt-8 font-display text-4xl font-extrabold text-ink"
             >
-              You&apos;re in, {first}!
+              {mode === "login"
+                ? `Welcome back, ${first}!`
+                : `You're in, ${first}!`}
             </motion.h1>
             <p className="mt-2 text-lg text-muted" role="status">
-              Finding programs for you…
+              {mode === "login"
+                ? "Logging you in…"
+                : "Setting up your account…"}
             </p>
           </motion.section>
         )}

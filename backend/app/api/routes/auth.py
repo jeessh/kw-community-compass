@@ -21,7 +21,7 @@ from app.core.config import settings
 from app.core.security import decode_token
 from app.models.host import Host
 from app.models.user import User
-from app.schemas.auth import HostLogin, HostSignup, UserLogin, UserSignup
+from app.schemas.auth import HostLogin, HostSignup, UserAuth, UserLogin, UserSignup
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -107,6 +107,71 @@ def login_user(body: UserLogin, response: Response, db: Session = Depends(get_db
             set_auth_cookie(response, create_access_token(user.id, "user"))
             return {"id": str(user.id), "username": user.username, "role": "user"}
     raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid username or password")
+
+
+@router.post("/user")
+def auth_user(body: UserAuth, response: Response, db: Session = Depends(get_db)):
+    """Unified member entry. If the name + icon key matches an existing account,
+    log in; otherwise create a new account. Returns `mode` ("login"/"signup") so
+    the UI can show the right text."""
+    try:
+        icons = validate_icon_selection(body.icons)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+
+    username = _make_username(body.first_name, body.last_name)
+    password = icons_to_password(icons)
+
+    # 1) Existing record? Match name + icon key. Usernames aren't unique, so
+    #    verify the icon-derived password against each same-named account.
+    for user in db.query(User).filter(User.username == username).all():
+        if verify_password(password, user.password_hash):
+            set_auth_cookie(response, create_access_token(user.id, "user"))
+            return {
+                "mode": "login",
+                "id": str(user.id),
+                "username": user.username,
+                "icons": user.icons,
+            }
+
+    # 2) No match. If those icons already belong to someone else, we can't
+    #    create the account (icons are globally unique).
+    if db.query(User).filter(User.icons == icons).first():
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "That icon combination is already taken — pick a different set of "
+            "icons.",
+        )
+
+    # 3) Fresh name + icons → create the account.
+    user = User(
+        first_name=body.first_name.strip(),
+        last_name=body.last_name.strip(),
+        username=username,
+        password_hash=hash_password(password),
+        auth_type="icon",
+        icons=icons,
+        accessibility_prefs=body.accessibility_prefs,
+        interest_categories=body.interest_categories,
+    )
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "That icon combination is already taken — pick a different set of "
+            "icons.",
+        )
+    db.refresh(user)
+    set_auth_cookie(response, create_access_token(user.id, "user"))
+    return {
+        "mode": "signup",
+        "id": str(user.id),
+        "username": user.username,
+        "icons": user.icons,
+    }
 
 
 # ---------- Hosts / admins (email + password) ----------

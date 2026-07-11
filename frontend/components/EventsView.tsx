@@ -236,7 +236,7 @@ export function EventsView() {
 
   // Hold complete → pop the card, shrink it into the bottom-center user icon,
   // register attendance, then slide the next event in from the right.
-  const flyToIcon = useCallback(async () => {
+  const flyToDrop = useCallback(async () => {
     const ev = events[i];
     if (!ev || flying) return;
     setFlying(true);
@@ -636,12 +636,13 @@ export function EventsView() {
 /* ---------------- card ---------------- */
 
 function EventCard({ event, saved }: { event: Event; saved: boolean }) {
+  const headerColor = tagStyle(event.category || "General").color;
   return (
     <div className="flex h-full flex-col">
-      {/* pink header: braille handle + drag-to-save */}
+      {/* header tinted by the event's category + braille handle / drag-to-save */}
       <div
         className="flex items-center justify-between px-5 py-3"
-        style={{ background: BERRY }}
+        style={{ background: headerColor }}
       >
         <BrailleHandle />
         <span className="flex items-center gap-2 font-semibold text-white">
@@ -702,29 +703,14 @@ function BrailleHandle() {
 
 /* ---------------- neighbours ---------------- */
 
+// Neighbour preview: rough shape only — a category-tinted top bar over a plain
+// body rectangle. No image, text, or details (those are for the focused card).
 function CardSkeleton({ event }: { event: Event }) {
+  const barColor = tagStyle(event.category || "General").color;
   return (
     <div className="flex h-full flex-col" aria-hidden>
-      <div className="h-11 w-full" style={{ background: BERRY, opacity: 0.55 }} />
-      <div className="flex flex-1 gap-4 p-4">
-        <div className="relative h-full w-[42%] shrink-0 overflow-hidden rounded-2xl bg-edge">
-          {event.cover_image_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={event.cover_image_url}
-              alt=""
-              className="h-full w-full object-cover"
-              draggable={false}
-            />
-          )}
-        </div>
-        <div className="flex-1 space-y-2 pt-1">
-          <div className="h-5 w-3/4 rounded bg-edge" />
-          <div className="h-3 w-1/2 rounded bg-edge" />
-          <div className="h-3 w-full rounded bg-edge" />
-          <div className="h-3 w-5/6 rounded bg-edge" />
-        </div>
-      </div>
+      <div className="h-11 w-full" style={{ background: barColor, opacity: 0.65 }} />
+      <div className="flex-1 bg-card" />
     </div>
   );
 }
