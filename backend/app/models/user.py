@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, UniqueConstraint, func
+from sqlalchemy import DateTime, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,7 +24,10 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String)
     # 'icon' (default) means password is the icon slugs; 'password' means custom.
     auth_type: Mapped[str] = mapped_column(String, default="icon")
-    icons: Mapped[list[str]] = mapped_column(ARRAY(String))  # unique identifier
+    # ARRAY(Text) not ARRAY(String): the DB column is text[], and equality
+    # filters (see _allocate_unique_icons) bind the literal with the column's
+    # type — varchar[] vs text[] has no Postgres operator and 500s on signup.
+    icons: Mapped[list[str]] = mapped_column(ARRAY(Text))  # unique identifier
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

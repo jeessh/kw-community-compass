@@ -20,11 +20,31 @@ const HOLD_KEY_MS = 1500; // keyboard hold (ArrowDown / ArrowUp)
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
+// Directional slide for the active card. `dir` is passed via `custom`:
+// +1 → new card enters from the right (advancing), -1 → from the left.
+const cardVariants = {
+  enter: (dir: number) => ({
+    x: dir > 0 ? 320 : -320,
+    opacity: 0,
+    scale: 0.92,
+    rotate: dir > 0 ? 4 : -4,
+  }),
+  center: { x: 0, opacity: 1, scale: 1, rotate: 0 },
+  exit: (dir: number) => ({
+    x: dir > 0 ? -320 : 320,
+    opacity: 0,
+    scale: 0.92,
+    rotate: dir > 0 ? -4 : 4,
+  }),
+};
+
 export function EventsView() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [i, setI] = useState(0);
+  // +1 = advancing (new card enters from the right), -1 = going back.
+  const [dir, setDir] = useState(1);
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<"loading" | "ready" | "empty">(
     "loading",
@@ -65,20 +85,21 @@ export function EventsView() {
   }, [router]);
 
   const current = events[i];
+  const n = events.length;
+  // Neighbors for the faded "peek" cards behind the active one.
+  const prevEvent = n > 1 ? events[(i - 1 + n) % n] : null;
+  const nextEvent = n > 1 ? events[(i + 1) % n] : null;
 
-  const next = useCallback(
-    () => setEvents((ev) => (setI((n) => (n + 1) % Math.max(ev.length, 1)), ev)),
-    [],
-  );
-  const prev = useCallback(
-    () =>
-      setEvents(
-        (ev) => (
-          setI((n) => (n - 1 + ev.length) % Math.max(ev.length, 1)), ev
-        ),
-      ),
-    [],
-  );
+  const next = useCallback(() => {
+    setDir(1);
+    setEvents((ev) => (setI((n) => (n + 1) % Math.max(ev.length, 1)), ev));
+  }, []);
+  const prev = useCallback(() => {
+    setDir(-1);
+    setEvents(
+      (ev) => (setI((n) => (n - 1 + ev.length) % Math.max(ev.length, 1)), ev),
+    );
+  }, []);
 
   const saveCurrent = useCallback(async () => {
     const ev = events[i];
@@ -223,50 +244,73 @@ export function EventsView() {
             <SideNav side="left" onClick={prev} />
             <SideNav side="right" onClick={next} />
 
-            {/* the card */}
-            <motion.div
-              key={current.id}
-              drag
-              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-              dragElastic={0.65}
-              style={{ x, y, rotate }}
-              whileDrag={{ scale: 1.04 }}
-              onDragStart={() => {
-                cancelSaveHold();
-                cancelSettingsHold();
-              }}
-              onDrag={(_, info) => {
-                const dy = info.offset.y;
-                if (dy > 0) {
-                  setSaveReveal(clamp01(dy / DROP_THRESHOLD));
-                  setSettingsReveal(0);
-                } else {
-                  setSettingsReveal(clamp01(-dy / SETTINGS_THRESHOLD));
-                  setSaveReveal(0);
-                }
-              }}
-              onDragEnd={(_, info) => {
-                const dy = info.offset.y;
-                setSaveReveal(0);
-                setSettingsReveal(0);
-                if (dy > DROP_THRESHOLD) void saveCurrent();
-                else if (dy < -SETTINGS_THRESHOLD) openSettings();
-              }}
-              onPointerDown={() => startSaveHold(HOLD_TOUCH_MS)}
-              onPointerUp={cancelSaveHold}
-              onPointerCancel={cancelSaveHold}
-              className="relative aspect-[3/2] w-full max-w-[720px] cursor-grab overflow-hidden rounded-[28px] bg-card shadow-card active:cursor-grabbing"
-            >
-              <EventCard event={current} saved={alreadySaved} />
+            {/* card stage: faded peek neighbors + the active, sliding card */}
+            <div className="relative aspect-[3/2] w-full max-w-[720px]">
+              {/* faded peek cards behind the active one */}
+              {prevEvent && prevEvent.id !== current.id && (
+                <PeekCard event={prevEvent} side="left" onClick={prev} />
+              )}
+              {nextEvent && nextEvent.id !== current.id && (
+                <PeekCard event={nextEvent} side="right" onClick={next} />
+              )}
 
-              {/* radial hold ring */}
-              <HoldRing progress={saveReveal} />
+              <AnimatePresence initial={false} custom={dir} mode="popLayout">
+                <motion.div
+                  key={current.id}
+                  custom={dir}
+                  variants={cardVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{
+                    type: "spring",
+                    stiffness: 320,
+                    damping: 34,
+                    opacity: { duration: 0.18 },
+                  }}
+                  drag
+                  dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                  dragElastic={0.65}
+                  style={{ x, y, rotate }}
+                  whileDrag={{ scale: 1.04 }}
+                  onDragStart={() => {
+                    cancelSaveHold();
+                    cancelSettingsHold();
+                  }}
+                  onDrag={(_, info) => {
+                    const dy = info.offset.y;
+                    if (dy > 0) {
+                      setSaveReveal(clamp01(dy / DROP_THRESHOLD));
+                      setSettingsReveal(0);
+                    } else {
+                      setSettingsReveal(clamp01(-dy / SETTINGS_THRESHOLD));
+                      setSaveReveal(0);
+                    }
+                  }}
+                  onDragEnd={(_, info) => {
+                    const dy = info.offset.y;
+                    setSaveReveal(0);
+                    setSettingsReveal(0);
+                    if (dy > DROP_THRESHOLD) void saveCurrent();
+                    else if (dy < -SETTINGS_THRESHOLD) openSettings();
+                  }}
+                  onPointerDown={() => startSaveHold(HOLD_TOUCH_MS)}
+                  onPointerUp={cancelSaveHold}
+                  onPointerCancel={cancelSaveHold}
+                  className="absolute inset-0 cursor-grab overflow-hidden rounded-[28px] bg-card shadow-card active:cursor-grabbing"
+                >
+                  <EventCard event={current} saved={alreadySaved} />
 
-              {/* confirm sweep */}
-              <AnimatePresence>
-                {confirming && <ConfirmSweep />}
+                  {/* radial hold ring */}
+                  <HoldRing progress={saveReveal} />
+
+                  {/* confirm sweep */}
+                  <AnimatePresence>
+                    {confirming && <ConfirmSweep />}
+                  </AnimatePresence>
+                </motion.div>
               </AnimatePresence>
-            </motion.div>
+            </div>
 
             {/* progress dots */}
             <div className="mt-6 flex gap-2" aria-hidden>
@@ -350,23 +394,59 @@ function EventCard({ event, saved }: { event: Event; saved: boolean }) {
   );
 }
 
+function PeekCard({
+  event,
+  side,
+  onClick,
+}: {
+  event: Event;
+  side: "left" | "right";
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      aria-hidden
+      tabIndex={-1}
+      initial={false}
+      animate={{
+        x: side === "left" ? "-14%" : "14%",
+        scale: 0.9,
+        opacity: 0.45,
+      }}
+      transition={{ type: "spring", stiffness: 260, damping: 32 }}
+      className="absolute inset-0 -z-10 cursor-pointer overflow-hidden rounded-[28px] bg-card shadow-card blur-[1px]"
+    >
+      <EventCard event={event} saved={false} />
+      {/* wash to push it visually behind the active card */}
+      <span className="pointer-events-none absolute inset-0 bg-paper/40" />
+    </motion.button>
+  );
+}
+
 function SaveSlot({ reveal }: { reveal: number }) {
+  // Full-width bottom glow that rises up the screen and intensifies as the
+  // member nears confirmation. Height grows from ~18vh to ~55vh of the viewport.
+  const heightVh = 18 + reveal * 37;
   return (
     <div
       className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center"
-      style={{ opacity: reveal }}
+      style={{ opacity: clamp01(reveal * 1.15) }}
     >
       <div
-        className="flex h-40 w-[560px] max-w-[80vw] flex-col items-center justify-end pb-6"
+        className="flex w-full flex-col items-center justify-end pb-8"
         style={{
-          background:
-            "radial-gradient(80% 120% at 50% 120%, rgba(255,122,77,0.35), rgba(255,122,77,0) 70%)",
+          height: `${heightVh}vh`,
+          background: `radial-gradient(140% 100% at 50% 130%, rgba(255,122,77,${
+            0.28 + reveal * 0.4
+          }), rgba(255,122,77,0) 72%)`,
         }}
       >
         <motion.div
           animate={{ y: [0, -10, 0] }}
           transition={{ repeat: Infinity, duration: 1.1 }}
-          style={{ scale: 0.7 + reveal * 0.6 }}
+          style={{ scale: 0.7 + reveal * 0.7 }}
           className="text-4xl text-pop"
         >
           ↑

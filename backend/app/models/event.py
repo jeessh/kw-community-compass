@@ -28,7 +28,7 @@ class Event(Base):
         DateTime(timezone=True), nullable=True
     )
     accessibility_tags: Mapped[list[str]] = mapped_column(
-        ARRAY(String), default=list
+        ARRAY(Text), default=list  # text[] to match the DB; see user.icons note
     )
     is_free: Mapped[bool] = mapped_column(Boolean, default=True)
     # True = member must sign up (creates an Attendance row); False = drop-in,
