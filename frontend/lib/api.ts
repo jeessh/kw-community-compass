@@ -28,6 +28,7 @@ export type EventImage = { id: string; url: string; caption?: string | null };
 export type Event = {
   id: string;
   host_id: string;
+  host_name: string;
   title: string;
   description: string;
   category?: string | null;

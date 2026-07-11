@@ -51,5 +51,6 @@ class EventOut(EventBase):
 
     id: uuid.UUID
     host_id: uuid.UUID
+    host_name: str = ""
     images: list[EventImageOut] = []
     created_at: datetime

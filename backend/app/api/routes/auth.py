@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -6,7 +7,11 @@ from app.api.deps import (
     get_db,
     set_auth_cookie,
 )
-from app.core.icons import icons_to_password, random_icon_set
+from app.core.icons import (
+    icons_to_password,
+    random_icon_set,
+    validate_icon_selection,
+)
 from app.core.security import (
     create_access_token,
     hash_password,
@@ -43,24 +48,46 @@ def _allocate_unique_icons(db: Session) -> list[str]:
 
 @router.post("/signup/user", status_code=status.HTTP_201_CREATED)
 def signup_user(body: UserSignup, response: Response, db: Session = Depends(get_db)):
-    icons = _allocate_unique_icons(db)
     using_custom = bool(body.custom_password)
+    username = _make_username(body.first_name, body.last_name)
+
+    if body.icons is not None:
+        try:
+            icons = validate_icon_selection(body.icons)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    else:
+        icons = _allocate_unique_icons(db)
+
     password = body.custom_password or icons_to_password(icons)
 
     user = User(
         first_name=body.first_name.strip(),
         last_name=body.last_name.strip(),
-        username=_make_username(body.first_name, body.last_name),
+        username=username,
         password_hash=hash_password(password),
         auth_type="password" if using_custom else "icon",
         icons=icons,
+        accessibility_prefs=body.accessibility_prefs,
+        interest_categories=body.interest_categories,
     )
     db.add(user)
-    db.commit()
+    try:
+        # `icons` is globally unique (uq_users_icons) — and ordered, so
+        # tree_cat_apple and cat_apple_tree are distinct keys.
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "That icon combination is already taken — pick a different set of "
+            "icons.",
+        )
     db.refresh(user)
 
     set_auth_cookie(response, create_access_token(user.id, "user"))
     # Return the icons so the FE can show the member their login credentials.
+    # Prefs are intentionally omitted here — the wizard re-reads GET /users/me.
     return {
         "id": str(user.id),
         "username": user.username,

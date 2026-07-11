@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_host, get_db
 from app.models.event import Event
@@ -25,7 +25,7 @@ def list_events(
     db: Session = Depends(get_db),
 ):
     """Public discovery feed with needs + accessibility filters."""
-    query = db.query(Event)
+    query = db.query(Event).options(joinedload(Event.host))
     if category:
         query = query.filter(Event.category == category)
     if free is not None:

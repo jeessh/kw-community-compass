@@ -13,6 +13,8 @@ create table if not exists users (
     password_hash text not null,
     auth_type     text not null default 'icon',        -- 'icon' | 'password'
     icons         text[] not null,
+    accessibility_prefs text[] not null default '{}',   -- onboarding prefs (sort, not filter)
+    interest_categories text[] not null default '{}',
     created_at    timestamptz not null default now(),
     constraint uq_users_icons unique (icons)
 );

@@ -44,6 +44,12 @@ class Event(Base):
     )
 
     host = relationship("Host", back_populates="events")
+
+    @property
+    def host_name(self) -> str:
+        """Owning organization's display name, surfaced on EventOut for dashboards."""
+        return self.host.name if self.host else ""
+
     images = relationship(
         "EventImage",
         back_populates="event",

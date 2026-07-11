@@ -13,6 +13,8 @@ class UserOut(BaseModel):
     username: str
     auth_type: str
     icons: list[str]
+    accessibility_prefs: list[str]
+    interest_categories: list[str]
     created_at: datetime
 
 

@@ -24,10 +24,18 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String)
     # 'icon' (default) means password is the icon slugs; 'password' means custom.
     auth_type: Mapped[str] = mapped_column(String, default="icon")
-    # ARRAY(Text) not ARRAY(String): the DB column is text[], and equality
+    # ARRAY(Text) not ARRAY(String): the DB columns are text[], and equality
     # filters (see _allocate_unique_icons) bind the literal with the column's
-    # type — varchar[] vs text[] has no Postgres operator and 500s on signup.
+    # type — String binds varchar[], which has no `text[] = varchar[]` operator.
     icons: Mapped[list[str]] = mapped_column(ARRAY(Text))  # unique identifier
+    # Personalization prefs set during onboarding. Free-form slugs (the FE chip
+    # taxonomy constrains input); used to SORT the feed, never to filter it.
+    accessibility_prefs: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, default=list, server_default="{}"
+    )
+    interest_categories: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, default=list, server_default="{}"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
