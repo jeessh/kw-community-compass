@@ -40,7 +40,10 @@ import { SavedEvents } from "@/components/SavedEvents";
 const DROP_THRESHOLD = 150; // drag-down px to save
 const SETTINGS_THRESHOLD = 130; // drag-up px to open settings
 const HOLD_TOUCH_MS = 2000; // press-and-hold on touch/mouse
-const HOLD_KEY_MS = 2000; // keyboard hold (ArrowDown / ArrowUp)
+const HOLD_KEY_MS = 1000; // keyboard hold (ArrowUp / ArrowDown)
+const NAV_HOVER_MS = 1500; // hover-dwell on a side zone to move
+const NAV_PRESS_MS = 500; // press-and-hold a side zone to move (also covers touch)
+const NAV_PEEK = 96; // px the whole carousel slides while a side dwell builds
 const BERRY = "#E8318A"; // card header + primary accent
 
 // How each side card sits: translate px, scale, opacity, stacking.
@@ -118,12 +121,20 @@ export function EventsView() {
   const flyY = useMotionValue(0);
   const cardScale = useMotionValue(1);
   const cardOpacity = useMotionValue(1);
+  // Whole-carousel horizontal shift while a side-zone dwell builds (the "peek").
+  const peekX = useMotionValue(0);
 
   const cardWrapRef = useRef<HTMLDivElement>(null);
   const dropRef = useRef<HTMLDivElement>(null); // fly target: the drop zone
+  const peekSideRef = useRef<"left" | "right" | null>(null);
+
+  // Which side zone is currently dwelling + how far along (0→1), for its UI.
+  const [peekSide, setPeekSide] = useState<"left" | "right" | null>(null);
+  const [navProgress, setNavProgress] = useState(0);
 
   const holdSave = useHold();
   const holdSettings = useHold();
+  const holdNav = useHold();
 
   const {
     supported: ttsSupported,
@@ -347,6 +358,67 @@ export function EventsView() {
   const cancelSettingsHold = useCallback(() => {
     holdSettings.cancel(() => setSettingsReveal(0));
   }, [holdSettings]);
+
+  // ---- side-zone navigation (hover-dwell or press-and-hold) ----
+  // A dwell can span state changes (Settings opening, a save-fly starting), so
+  // its guard reads live refs rather than the values closed over when it began
+  // — otherwise the auto-repeat would keep firing prev/next in the background.
+  const flyingRef = useRef(flying);
+  flyingRef.current = flying;
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const navBlocked = () => flyingRef.current || viewRef.current === "settings";
+
+  // Dwelling a side zone slides the whole carousel toward the other side; when
+  // the timer completes it commits the move (prev / next) and — while the
+  // pointer stays on the zone — keeps going so you can browse continuously.
+  const runNav = useCallback(
+    (side: "left" | "right", ms: number) => {
+      if (navBlocked()) return;
+      peekSideRef.current = side;
+      setPeekSide(side);
+      const sign = side === "left" ? 1 : -1; // left → slide right, right → slide left
+      holdNav.start(
+        ms,
+        (p) => {
+          peekX.set(sign * p * NAV_PEEK);
+          setNavProgress(p);
+        },
+        () => {
+          peekX.set(0);
+          setNavProgress(0);
+          // Bail if state flipped mid-dwell (Settings opened / card flying).
+          if (navBlocked()) {
+            peekSideRef.current = null;
+            setPeekSide(null);
+            return;
+          }
+          if (side === "left") prev();
+          else next();
+          if (peekSideRef.current === side) runNav(side, ms);
+        },
+      );
+    },
+    [holdNav, peekX, prev, next],
+  );
+
+  // Restart the dwell with a new duration (hover ↔ press) from a clean state.
+  const startNav = useCallback(
+    (side: "left" | "right", ms: number) => {
+      holdNav.cancel();
+      runNav(side, ms);
+    },
+    [holdNav, runNav],
+  );
+
+  // Pointer left / released the zone before completing → smoothly slide back.
+  const resetNav = useCallback(() => {
+    peekSideRef.current = null;
+    holdNav.cancel();
+    setPeekSide(null);
+    setNavProgress(0);
+    void animate(peekX, 0, { type: "spring", stiffness: 300, damping: 30 });
+  }, [holdNav, peekX]);
 
   // ---- preferences (persist to profile) ----
   const setPref = useCallback(async (patch: MePrefs) => {
@@ -586,24 +658,51 @@ export function EventsView() {
 
             {/* carousel */}
             <div className="relative flex w-full flex-1 items-center justify-center">
-              <SideNav side="left" onClick={prev} />
-              <SideNav side="right" onClick={next} />
+              <SideZone
+                side="left"
+                progress={peekSide === "left" ? navProgress : 0}
+                active={peekSide === "left"}
+                disabled={flying}
+                onEnter={() => startNav("left", NAV_HOVER_MS)}
+                onDown={() => startNav("left", NAV_PRESS_MS)}
+                onUp={() => startNav("left", NAV_HOVER_MS)}
+                onLeave={resetNav}
+              />
+              <SideZone
+                side="right"
+                progress={peekSide === "right" ? navProgress : 0}
+                active={peekSide === "right"}
+                disabled={flying}
+                onEnter={() => startNav("right", NAV_HOVER_MS)}
+                onDown={() => startNav("right", NAV_PRESS_MS)}
+                onUp={() => startNav("right", NAV_HOVER_MS)}
+                onLeave={resetNav}
+              />
 
-              {[-2, -1, 1, 2].map((off) => (
-                <NeighborCard key={off} event={slotEvent(off)} offset={off} />
-              ))}
-
+              {/* peek group: neighbours + focused card slide together on a dwell.
+                  Sits above the side zones (z-30 > z-20) so the card always wins
+                  pointer events where they overlap, but is pointer-events-none so
+                  its transparent flanks pass hover through to the zones; the card
+                  itself re-enables events. */}
               <motion.div
-                ref={cardWrapRef}
-                style={{
-                  x: flyX,
-                  y: flyY,
-                  scale: cardScale,
-                  opacity: cardOpacity,
-                  zIndex: 30,
-                }}
-                className="relative aspect-[16/9] w-full max-w-[760px]"
+                style={{ x: peekX }}
+                className="pointer-events-none absolute inset-0 z-30 grid place-items-center"
               >
+                {[-2, -1, 1, 2].map((off) => (
+                  <NeighborCard key={off} event={slotEvent(off)} offset={off} />
+                ))}
+
+                <motion.div
+                  ref={cardWrapRef}
+                  style={{
+                    x: flyX,
+                    y: flyY,
+                    scale: cardScale,
+                    opacity: cardOpacity,
+                    zIndex: 30,
+                  }}
+                  className="pointer-events-auto relative aspect-[16/9] w-full max-w-[760px]"
+                >
                 {/* Slide the focused card in from the travel direction on
                     next/back. Enter-only (keyed by id) so it never fights the
                     inner drag x/y or the fly-to-icon transforms. */}
@@ -627,6 +726,7 @@ export function EventsView() {
                   onDragStart={() => {
                     cancelSaveHold();
                     cancelSettingsHold();
+                    resetNav();
                   }}
                   onDrag={(_, info) => {
                     const dyy = info.offset.y;
@@ -658,29 +758,8 @@ export function EventsView() {
                 </motion.div>
                 </motion.div>
               </motion.div>
-            </div>
-
-            {/* hint: the ↓ arrow key saves the focused card */}
-            {!flying && !confirming && (
-              <motion.div
-                aria-hidden
-                initial={reduceMotion ? false : { opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="mt-2 flex flex-col items-center gap-0.5 text-ink/70"
-              >
-                <motion.span
-                  className="text-2xl leading-none"
-                  style={{ color: BERRY }}
-                  animate={reduceMotion ? undefined : { y: [0, 5, 0] }}
-                  transition={{ repeat: Infinity, duration: 1.2 }}
-                >
-                  ↓
-                </motion.span>
-                <span className="text-xs font-semibold">
-                  Press ↓ to save
-                </span>
               </motion.div>
-            )}
+            </div>
           </>
         )}
 
@@ -1175,29 +1254,62 @@ function ConfirmSweep() {
 
 /* ---------------- side nav ---------------- */
 
-function SideNav({
+// A whole-flank hover / press target. Hovering it (or pressing on touch) starts
+// a dwell that slides the carousel and, when the timer fills, moves a card.
+// There is no click-to-navigate — the dwell is the only pointer path.
+function SideZone({
   side,
-  onClick,
+  progress,
+  active,
+  disabled,
+  onEnter,
+  onLeave,
+  onDown,
+  onUp,
 }: {
   side: "left" | "right";
-  onClick: () => void;
+  progress: number;
+  active: boolean;
+  disabled: boolean;
+  onEnter: () => void;
+  onLeave: () => void;
+  onDown: () => void;
+  onUp: () => void;
 }) {
+  const isLeft = side === "left";
   return (
     <div
-      className={`absolute top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-2 ${
-        side === "left" ? "left-2" : "right-2"
+      aria-hidden
+      onPointerEnter={disabled ? undefined : onEnter}
+      onPointerLeave={onLeave}
+      onPointerDown={disabled ? undefined : onDown}
+      onPointerUp={onUp}
+      onPointerCancel={onLeave}
+      className={`absolute inset-y-6 z-20 flex cursor-pointer items-center ${
+        isLeft ? "left-0 justify-start pl-3" : "right-0 justify-end pr-3"
       }`}
+      style={{ width: "calc(50% - 380px)", minWidth: "96px" }}
     >
-      <button
-        onClick={onClick}
-        aria-label={side === "left" ? "Previous program" : "Next program"}
-        className="grid h-16 w-16 place-items-center rounded-full border-2 border-edge bg-white text-3xl text-ink shadow-card transition-transform hover:scale-105"
+      <div
+        className="flex flex-col items-center gap-2 rounded-3xl px-4 py-6 transition-colors"
+        style={{ background: active ? "rgba(232,49,138,0.08)" : "transparent" }}
       >
-        <span aria-hidden>{side === "left" ? "←" : "→"}</span>
-      </button>
-      <span className="font-display text-lg font-semibold text-ink">
-        {side === "left" ? "Back" : "Next"}
-      </span>
+        <div
+          className="grid h-16 w-16 place-items-center rounded-full border-2 border-edge bg-white text-3xl text-ink shadow-card transition-transform"
+          style={{ transform: active ? "scale(1.08)" : "none" }}
+        >
+          <span aria-hidden>{isLeft ? "←" : "→"}</span>
+        </div>
+        <span className="font-display text-lg font-semibold text-ink">
+          {isLeft ? "Back" : "Next"}
+        </span>
+        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-edge/70">
+          <div
+            className="h-full rounded-full transition-[width] duration-75"
+            style={{ width: `${Math.round(progress * 100)}%`, background: BERRY }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
