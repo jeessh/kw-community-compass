@@ -142,8 +142,8 @@ export function useHeadTracking(
     const sx = filtersRef.current.x.filter(cx, now);
     const sy = filtersRef.current.y.filter(cy, now);
 
-    // While calibrating, show the cursor but freeze dwell so drifting to an edge
-    // can't fire next/prev/add underneath the overlay.
+    // Freeze dwell during the calibrating→done transition frames (the map
+    // exists a beat before calibratingRef flips) so no action can fire early.
     if (calibratingRef.current) {
       dwellRef.current = { zone: null, stage: "idle", start: 0 };
       setCursor({ x: sx, y: sy, visible: true, zone: null, stage: "idle", progress: 0 });
