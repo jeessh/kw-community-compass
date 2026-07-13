@@ -64,16 +64,6 @@ export function useHeadTracking(
   const [cursor, setCursor] = useState<CursorState>(INITIAL);
   // A face is detected when the tracker has landmark positions.
   const [faceReady, setFaceReady] = useState(false);
-  // TEMP diagnostics: localize where the pipeline stalls.
-  const [debug, setDebug] = useState<{
-    faceCount: number;
-    frames: number;
-    proxy: HeadProxy | null;
-    samples: number;
-    calibrated: boolean;
-  }>({ faceCount: 0, frames: 0, proxy: null, samples: 0, calibrated: false });
-  const frameRef = useRef(0);
-  const sampleCountRef = useRef(0);
 
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
@@ -108,7 +98,6 @@ export function useHeadTracking(
   // One frame: read landmarks → head proxy → (if calibrated) map to screen,
   // smooth, classify the zone, and advance the dwell timer.
   const tick = useCallback(() => {
-    frameRef.current += 1;
     const lm = webgazerRef.current?.getTracker?.()?.getPositions?.() ?? null;
     const proxy = lm ? headProxy(lm) : null;
     proxyRef.current = proxy;
@@ -199,8 +188,6 @@ export function useHeadTracking(
     calibRef.current = new HeadMap();
     mapRef.current = null;
     filtersRef.current = null;
-    sampleCountRef.current = 0;
-    frameRef.current = 0;
     setError(null);
     setCalibrating(true);
 
@@ -211,7 +198,6 @@ export function useHeadTracking(
         const webgazer = (mod as any).default ?? mod;
         if (!startedRef.current) return;
         webgazerRef.current = webgazer;
-        console.log("[head] webgazer loaded; starting facemesh…");
 
         // The mediapipe facemesh assets are served from /public (node_modules
         // isn't on the web path); point WebGazer at that absolute path, else the
@@ -229,7 +215,6 @@ export function useHeadTracking(
           return;
         }
         webgazer.showVideoPreview(previewWantedRef.current);
-        console.log("[head] begin() resolved — head tracking live");
 
         // Drive our own per-frame loop off the facemesh landmarks.
         const loop = () => {
@@ -278,28 +263,19 @@ export function useHeadTracking(
     };
   }, [enabled]);
 
-  // While enabled, poll the tracker for a detected face + gather diagnostics.
+  // While enabled, poll the tracker for a detected face (drives the aim hint).
   useEffect(() => {
     if (!enabled) {
       setFaceReady(false);
       return;
     }
     const id = window.setInterval(() => {
-      let faceCount = 0;
       try {
         const pos = webgazerRef.current?.getTracker?.()?.getPositions?.();
-        faceCount = Array.isArray(pos) ? pos.length : pos ? 1 : 0;
+        setFaceReady(Array.isArray(pos) ? pos.length > 0 : !!pos);
       } catch {
-        /* ignore */
+        setFaceReady(false);
       }
-      setFaceReady(faceCount > 0);
-      setDebug({
-        faceCount,
-        frames: frameRef.current,
-        proxy: proxyRef.current,
-        samples: sampleCountRef.current,
-        calibrated: !!mapRef.current,
-      });
     }, 300);
     return () => window.clearInterval(id);
   }, [enabled]);
@@ -312,7 +288,6 @@ export function useHeadTracking(
     const proxy = proxyRef.current;
     if (!proxy || !calibRef.current) return;
     calibRef.current.add(proxy.yaw, proxy.pitch, x, y);
-    sampleCountRef.current += 1;
   }, []);
 
   // Toggle the camera preview (the overlay hides it while pointing at dots so it
@@ -344,7 +319,6 @@ export function useHeadTracking(
     error,
     cursor,
     faceReady,
-    debug,
     readProxy,
     recordCalibrationPoint,
     finishCalibration,

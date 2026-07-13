@@ -491,7 +491,6 @@ export function EventsView({
     calibrating,
     cursor,
     faceReady,
-    debug: headDebug,
     error: headError,
     readProxy,
     recordCalibrationPoint,
@@ -611,20 +610,12 @@ export function EventsView({
         </div>
       )}
 
-      {/* TEMP head-tracking diagnostics — remove once calibration is confirmed */}
-      {headEnabled && headSupported && (
-        <div className="pointer-events-none fixed bottom-4 left-4 z-50 rounded-lg bg-black/85 px-3 py-2 font-mono text-xs leading-5 text-lime-300">
-          <div>face: {headDebug.faceCount > 0 ? `yes (${headDebug.faceCount} pts)` : "NO"}</div>
-          <div>frames: {headDebug.frames}</div>
-          <div>
-            proxy:{" "}
-            {headDebug.proxy
-              ? `${headDebug.proxy.yaw.toFixed(2)}, ${headDebug.proxy.pitch.toFixed(2)}`
-              : "null"}
-          </div>
-          <div>samples: {headDebug.samples}</div>
-          <div>calibrated: {headDebug.calibrated ? "yes" : "no"}</div>
-          {headError && <div className="text-red-400">err: {headError}</div>}
+      {headEnabled && headError && (
+        <div
+          role="alert"
+          className="pointer-events-none absolute left-4 top-16 z-40 max-w-xs rounded-xl bg-pop px-3 py-2 text-sm font-medium text-white"
+        >
+          {headError}
         </div>
       )}
 
