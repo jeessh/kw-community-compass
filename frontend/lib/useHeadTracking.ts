@@ -102,8 +102,16 @@ export function useHeadTracking(
     const proxy = lm ? headProxy(lm) : null;
     proxyRef.current = proxy;
 
-    if (!proxy || pausedRef.current) {
-      if (!proxy) setCursor((g) => (g.visible ? { ...g, visible: false } : g));
+    // Pause only applies outside calibration (the overlay opens from the a11y
+    // menu, which keeps `paused` true the whole time). Reset dwell on any bail
+    // so a hold that was building when a panel opened can't fire on resume.
+    if (!proxy || (pausedRef.current && !calibratingRef.current)) {
+      dwellRef.current = { zone: null, stage: "idle", start: 0 };
+      setCursor((g) =>
+        g.visible || g.stage !== "idle"
+          ? { ...g, visible: false, zone: null, stage: "idle", progress: 0 }
+          : g,
+      );
       return;
     }
 
@@ -180,8 +188,37 @@ export function useHeadTracking(
       setError("Head tracking needs a webcam and a secure (https) connection.");
       return;
     }
-    // Already started for this enable: do nothing (stops the re-flash).
-    if (startedRef.current) return;
+    // Deferred teardown: a StrictMode remount clears the timer first, so
+    // WebGazer survives and doesn't re-flash; a real disable lets it fire. It
+    // must be returned from EVERY started path — the remount path included —
+    // or that remount registers a no-op cleanup and a later disable would
+    // leave the webcam and rAF loop running.
+    const scheduleTeardown = () => {
+      teardownTimerRef.current = window.setTimeout(() => {
+        startedRef.current = false;
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
+        const wg = webgazerRef.current;
+        webgazerRef.current = null;
+        filtersRef.current = null;
+        dwellRef.current = { zone: null, stage: "idle", start: 0 };
+        setCursor(INITIAL);
+        setCalibrating(false);
+        if (wg) {
+          try {
+            wg.clearGazeListener?.();
+            wg.end();
+          } catch {
+            /* ignore */
+          }
+        }
+      }, 0);
+    };
+
+    // Already started for this enable (StrictMode remount): keep the session.
+    if (startedRef.current) return scheduleTeardown;
     startedRef.current = true;
 
     // Fresh calibration each enable.
@@ -236,31 +273,7 @@ export function useHeadTracking(
       }
     })();
 
-    return () => {
-      // Defer teardown a tick: a StrictMode remount clears this timer first, so
-      // WebGazer survives and doesn't re-flash. A real disable lets it fire.
-      teardownTimerRef.current = window.setTimeout(() => {
-        startedRef.current = false;
-        if (rafRef.current !== null) {
-          cancelAnimationFrame(rafRef.current);
-          rafRef.current = null;
-        }
-        const wg = webgazerRef.current;
-        webgazerRef.current = null;
-        filtersRef.current = null;
-        dwellRef.current = { zone: null, stage: "idle", start: 0 };
-        setCursor(INITIAL);
-        setCalibrating(false);
-        if (wg) {
-          try {
-            wg.clearGazeListener?.();
-            wg.end();
-          } catch {
-            /* ignore */
-          }
-        }
-      }, 0);
-    };
+    return scheduleTeardown;
   }, [enabled]);
 
   // While enabled, poll the tracker for a detected face (drives the aim hint).

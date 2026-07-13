@@ -55,6 +55,7 @@ export function CalibrationOverlay({
   const currentRef = useRef(0);
   currentRef.current = current;
   const busyRef = useRef(false);
+  const burstRef = useRef<number | null>(null);
 
   // Camera visible while aiming, hidden while on the dots.
   useEffect(() => {
@@ -75,13 +76,27 @@ export function CalibrationOverlay({
       onPoint(px, py);
       if (++n >= SAMPLES_PER_POINT) {
         window.clearInterval(id);
+        burstRef.current = null;
         busyRef.current = false;
         const next = currentRef.current + 1;
         setCurrent(next);
         if (next >= POINTS.length) window.setTimeout(onDone, 200);
       }
     }, SAMPLE_GAP_MS);
+    burstRef.current = id;
   }, [onPoint, onDone]);
+
+  // Cancel an in-flight capture burst on phase change or unmount, so a burst
+  // can't keep sampling (or fire onDone) after Reposition/Cancel.
+  useEffect(() => {
+    return () => {
+      if (burstRef.current !== null) {
+        window.clearInterval(burstRef.current);
+        burstRef.current = null;
+      }
+      busyRef.current = false;
+    };
+  }, [phase]);
 
   // Callback refs: the parent may pass inline callbacks whose identity changes
   // every render. The effects below must depend only on `phase` — if they

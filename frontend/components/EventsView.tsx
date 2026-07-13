@@ -393,7 +393,8 @@ export function EventsView({
             setPeekSide(null);
             return;
           }
-          navFiredRef.current = true;
+          // Only press-holds get the click guard: their release fires a click.
+          if (ms === NAV_PRESS_MS) navFiredRef.current = true;
           if (side === "left") prev();
           else next();
           if (peekSideRef.current === side) runNav(side, ms);
