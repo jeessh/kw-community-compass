@@ -1,13 +1,14 @@
 """Vercel entrypoint: exposes the FastAPI app as an ASGI function.
 
-Vercel routes /api/* here with the prefix intact, so strip it before routing —
-FastAPI's root_path only fixes docs/OpenAPI URLs, it does not strip paths.
+Lives at backend/ so the @vercel/python builder bundles the whole app package
+alongside it. Vercel forwards the original /api-prefixed path, so strip it
+before FastAPI matches (root_path only fixes docs/OpenAPI URLs, not routing).
 """
 
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.main import app as fastapi_app  # noqa: E402
 
