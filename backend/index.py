@@ -1,8 +1,9 @@
-"""Vercel entrypoint: exposes the FastAPI app as an ASGI function.
+"""Vercel entrypoint for the backend service (see vercel.json `services`).
 
-Lives at backend/ so the @vercel/python builder bundles the whole app package
-alongside it. Vercel forwards the original /api-prefixed path, so strip it
-before FastAPI matches (root_path only fixes docs/OpenAPI URLs, not routing).
+`entrypoint: "index:app"` loads this ASGI app. A Vercel service receives the
+original request path, so /api/events arrives here as /api/events; the app's
+routers are prefix-agnostic (they're /events, /auth/... to match local dev),
+so strip the /api prefix here. root_path="/api" then only fixes docs URLs.
 """
 
 import os
